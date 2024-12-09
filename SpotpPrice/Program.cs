@@ -1,14 +1,30 @@
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Builder;
+using Azure.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SpotpPrice;
 
-var builder = FunctionsApplication.CreateBuilder(args);
+string env = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
 
-builder.ConfigureFunctionsWebApplication();
+var host = new HostBuilder()
 
-builder.Services
-      .AddApplicationInsightsTelemetryWorkerService()
-      .ConfigureFunctionsApplicationInsights();
+    //.ConfigureFunctionsWorkerDefaults()
+    .ConfigureFunctionsWebApplication()
+    .ConfigureAppConfiguration((context, config) =>
+    {
+        config.AddEnvironmentVariables();
+        config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        config.AddJsonFile($"appsettings.{env}.json", optional: false, reloadOnChange: true);
+    })
+    .ConfigureServices((appBuilder, services) =>
+    {
+        // Add the HttpClientFactory and configure it to use the named client
+        services.AddHttpClient<IStromPrisClient, StromPrisClient>(client =>
+        {
+            client.BaseAddress = new Uri(appBuilder.Configuration["Hvakosterstrommen:BaseUrl"]);
+        });
+    })
 
-builder.Build().Run();
+    .Build();
+
+host.Run();
